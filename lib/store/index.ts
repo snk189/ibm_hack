@@ -1,9 +1,9 @@
 // localStorage / IndexedDB helpers for Setu.
 // All user data lives on-device. No accounts, no server-side database.
 // Stores: user facts, call transcripts, outcome cards.
-// TODO: step 2 — implement get/set for user facts; step 5 — transcript append; step 4 — outcome save
 
 import type { Outcome, TranscriptEntry } from "../types";
+import { redact } from "../guard/redact";
 
 const FACTS_KEY = "setu:facts";
 const OUTCOMES_KEY = "setu:outcomes";
@@ -34,11 +34,16 @@ export function loadOutcomes(): Outcome[] {
   }
 }
 
-/** Append a single transcript entry to the in-progress call in sessionStorage. */
+/**
+ * Append a single transcript entry to the in-progress call in sessionStorage.
+ * Sensitive digit sequences are redacted before persisting (guard rule).
+ */
 export function appendTranscriptEntry(entry: TranscriptEntry): void {
   const raw = sessionStorage.getItem("setu:transcript") ?? "[]";
   const entries: TranscriptEntry[] = JSON.parse(raw);
-  entries.push(entry);
+  const redactedText = redact(entry.text);
+  const redacted = redactedText !== entry.text;
+  entries.push({ ...entry, text: redactedText, redacted: redacted || entry.redacted });
   sessionStorage.setItem("setu:transcript", JSON.stringify(entries));
 }
 
@@ -48,4 +53,8 @@ export function loadCurrentTranscript(): TranscriptEntry[] {
   } catch {
     return [];
   }
+}
+
+export function clearCurrentTranscript(): void {
+  sessionStorage.removeItem("setu:transcript");
 }
